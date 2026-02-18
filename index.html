@@ -1032,9 +1032,9 @@ function renderDiscord() {
           <div class="sync-icon">🤖</div>
           <div class="sync-info">
             <div class="sync-title">HERALD Bot — Connected & Syncing</div>
-            <div class="sync-sub">Server: Your Gaming Community · Members: 47 · Last sync: just now</div>
+            <div class="sync-sub">Server: NerdBrew & Nightshift · Discord Events integration active</div>
           </div>
-          <button class="btn btn-sm btn-cyan" onclick="showToast('Sync triggered!', 'success')">⟳ Sync Now</button>
+          <button class="btn btn-sm btn-cyan" onclick="syncDiscordEvents()">⟳ Sync Discord Events</button>
         </div>
 
         <div class="sidebar-title" style="margin-bottom:14px;">⚡ Bot Commands</div>
@@ -1306,6 +1306,28 @@ function toggleRSVP(id, e) {
 
 function rerenderModal() {
   render();
+}
+
+async function syncDiscordEvents() {
+  try {
+    showToast('Syncing Discord Events...', 'info');
+    const res = await fetch(`${API_URL}/events/sync/discord`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    
+    if (data.success) {
+      await fetchEvents(); // Refresh events list
+      render();
+      showToast(`✅ Synced ${data.synced} Discord events (${data.skipped} already existed)`, 'success');
+    } else {
+      showToast('Failed to sync Discord events', 'info');
+    }
+  } catch (err) {
+    console.error('Sync error:', err);
+    showToast('Failed to sync Discord events', 'info');
+  }
 }
 
 async function submitCreateEvent() {
