@@ -502,24 +502,101 @@
 
 <!-- ════════════════════════════ SCRIPTS ════════════════════════════ -->
 <script>
-// ── DATA ──
-const EVENTS = [
-  { id:1, title:'Valorant Squad Night', type:'gaming', date:'2026-02-18', time:'8:00 PM', duration:'3h', desc:'Weekly squad ranked grind. Drop in anytime. Calling all duelists!', host:'GhostRazer', rsvps:['GX','AV','NK','SB','TR'], maxSlots:null, discord:true },
-  { id:2, title:'Winter Tournament S3', type:'tournament', date:'2026-02-22', time:'2:00 PM', duration:'6h', desc:'Season 3 of our community tournament. $50 prize pool. Register before Feb 20!', host:'Admin_NightLog', rsvps:['GX','SB','NK','PK','LM','AR'], maxSlots:16, discord:true },
-  { id:3, title:'Chill Stream & Hang', type:'stream', date:'2026-02-20', time:'7:00 PM', duration:'2h', desc:'GhostRazer going live — come watch some cozy indie games and vibe.', host:'GhostRazer', rsvps:['AV','TR'], maxSlots:null, discord:true },
-  { id:4, title:'New Member Welcome', type:'social', date:'2026-02-25', time:'6:00 PM', duration:'1h', desc:'Monthly welcome session for all new members. Say hi, get roles, find your squad.', host:'Admin_NightLog', rsvps:['NK','LM','PK'], maxSlots:null, discord:true },
-  { id:5, title:'Minecraft Build Night', type:'gaming', date:'2026-03-01', time:'9:00 PM', duration:'4h', desc:'Community creative server build night. Theme: Cyberpunk City. Best build wins a custom role.', host:'CubeWarden', rsvps:['SB','AR'], maxSlots:20, discord:false },
-  { id:6, title:'League Draft Night', type:'tournament', date:'2026-03-05', time:'7:30 PM', duration:'4h', desc:'Draft-style team selection for the spring league. Captains pick on the night.', host:'Admin_NightLog', rsvps:['GX','TR','NK'], maxSlots:10, discord:true },
-];
+// ── API CONFIG ──
+const API_URL = 'https://nightlog-backend-production.up.railway.app/api';
 
-const MEMBERS = [
-  { id:1, name:'GhostRazer', tag:'ghostrazer#2891', role:'Moderator', events:14, rsvps:38, online:true, color:'linear-gradient(135deg, #6366f1, #7c3aed)', initials:'GR' },
-  { id:2, name:'AdminNightLog', tag:'nightlog#0001', role:'Admin', events:32, rsvps:61, online:true, color:'linear-gradient(135deg, #22d3ee, #6366f1)', initials:'AN' },
-  { id:3, name:'AvalonX', tag:'avalon#4521', role:'Member', events:7, rsvps:22, online:false, color:'linear-gradient(135deg, #ec4899, #7c3aed)', initials:'AV' },
-  { id:4, name:'NightKing', tag:'nkng#9302', role:'Member', events:5, rsvps:17, online:true, color:'linear-gradient(135deg, #10b981, #22d3ee)', initials:'NK' },
-  { id:5, name:'StealthBot', tag:'sbot#1102', role:'Member', events:9, rsvps:29, online:false, color:'linear-gradient(135deg, #f59e0b, #ec4899)', initials:'SB' },
-  { id:6, name:'TRex_Games', tag:'trex#5511', role:'Member', events:4, rsvps:11, online:true, color:'linear-gradient(135deg, #6366f1, #22d3ee)', initials:'TR' },
-];
+// ── DATA (loaded from API) ──
+let EVENTS = [];
+let MEMBERS = [];
+let isLoading = true;
+
+// ── API FUNCTIONS ──
+async function fetchEvents() {
+  try {
+    const res = await fetch(`${API_URL}/events`);
+    const data = await res.json();
+    if (data.success) {
+      // Transform API format to match our frontend expectations
+      EVENTS = data.events.map(e => ({
+        id: e.id,
+        title: e.title,
+        type: e.type,
+        date: e.event_date,
+        time: e.event_time || 'TBD',
+        duration: e.duration || 'TBD',
+        desc: e.description || '',
+        host: e.host_name || 'NIGHTLOG',
+        rsvps: [], // Will be populated when we fetch attendees
+        maxSlots: e.max_slots,
+        discord: e.discord_sync
+      }));
+    }
+  } catch (err) {
+    console.error('Failed to fetch events:', err);
+    showToast('Failed to load events from server', 'info');
+  }
+}
+
+async function fetchMembers() {
+  try {
+    const res = await fetch(`${API_URL}/members`);
+    const data = await res.json();
+    if (data.success) {
+      MEMBERS = data.members.map(m => ({
+        id: m.id,
+        name: m.username,
+        tag: m.tag || '',
+        role: m.role || 'Member',
+        events: m.events_hosted || 0,
+        rsvps: m.total_rsvps || 0,
+        online: false, // We don't track online status yet
+        color: `linear-gradient(135deg, #${Math.floor(Math.random()*16777215).toString(16)}, #${Math.floor(Math.random()*16777215).toString(16)})`,
+        initials: m.username.slice(0,2).toUpperCase()
+      }));
+    }
+  } catch (err) {
+    console.error('Failed to fetch members:', err);
+  }
+}
+
+async function createEvent(eventData) {
+  try {
+    const res = await fetch(`${API_URL}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: eventData.title,
+        description: eventData.desc,
+        type: eventData.type,
+        event_date: eventData.date,
+        event_time: eventData.time,
+        duration: eventData.duration,
+        discord_sync: true
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      await fetchEvents(); // Refresh the list
+      showToast(`"${eventData.title}" created & synced to Discord!`, 'success');
+      return true;
+    }
+  } catch (err) {
+    console.error('Failed to create event:', err);
+    showToast('Failed to create event', 'info');
+  }
+  return false;
+}
+
+// Load data on page load
+async function loadData() {
+  isLoading = true;
+  await Promise.all([fetchEvents(), fetchMembers()]);
+  isLoading = false;
+  render();
+}
+
+// Start loading immediately
+loadData();
 
 const TYPE_META = {
   gaming:     { label:'Gaming',     emoji:'🎮', cls:'tag-gaming',     banner:'' },
@@ -1001,28 +1078,16 @@ function rerenderModal() {
   render();
 }
 
-function submitCreateEvent() {
+async function submitCreateEvent() {
   if (!newEvent.title.trim()) { showToast('Please enter an event title', 'info'); return; }
   if (!newEvent.date) { showToast('Please pick a date', 'info'); return; }
-  const tid = newEvent.title;
-  EVENTS.push({
-    id: EVENTS.length + 1,
-    title: newEvent.title,
-    type: newEvent.type,
-    date: newEvent.date,
-    time: newEvent.time || '7:00 PM',
-    duration: newEvent.duration || '2h',
-    desc: newEvent.desc || 'No description provided.',
-    host: 'You',
-    rsvps: ['You'],
-    maxSlots: null,
-    discord: true,
-  });
-  userRSVPs.add(EVENTS.length);
-  newEvent = { title:'', type:'gaming', date:'', time:'18:00', duration:'2h', desc:'' };
-  createModalOpen = false;
-  showToast(`"${tid}" created & synced to Discord!`, 'success');
-  render();
+  
+  const success = await createEvent(newEvent);
+  if (success) {
+    newEvent = { title:'', type:'gaming', date:'', time:'18:00', duration:'2h', desc:'' };
+    createModalOpen = false;
+    render();
+  }
 }
 
 function saveWebhook() {
@@ -1042,7 +1107,8 @@ function showToast(msg, type = 'info') {
 }
 
 // ── INIT ──
-render();
+// Data loads automatically via loadData() above
+
 </script>
 </body>
 </html>
