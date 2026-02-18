@@ -487,11 +487,14 @@
       <button class="nav-btn" onclick="showPage('discord')">⬡ Discord</button>
     </nav>
     <div class="header-right">
-      <div class="discord-status" onclick="showToast('Discord bot connected — 47 members online', 'success')">
+      <div class="discord-status" onclick="showToast('Discord bot connected', 'success')">
         <div class="discord-dot"></div>
         BOT ONLINE
       </div>
-      <div class="avatar-btn" onclick="showPage('profiles')">GX</div>
+      ${currentUser 
+        ? `<div class="avatar-btn" onclick="logout()" title="Logout">${currentUser.username.slice(0,2).toUpperCase()}</div>`
+        : `<button class="btn btn-sm btn-primary" onclick="loginWithDiscord()">Login with Discord</button>`
+      }
     </div>
   </header>
 
@@ -505,10 +508,106 @@
 // ── API CONFIG ──
 const API_URL = 'https://nightlog-backend-production.up.railway.app/api';
 
+// ── AUTH (Discord OAuth) ──
+let currentUser = null; // null = not logged in
+let isLoading = true;
+
+// Check for returning OAuth code in URL
+const urlParams = new URLSearchParams(window.location.search);
+const oauthCode = urlParams.get('code');
+if (oauthCode) {
+  handleOAuthCallback(oauthCode);
+}
+
+// Try to load user from localStorage
+const savedUser = localStorage.getItem('nightlog_user');
+if (savedUser) {
+  currentUser = JSON.parse(savedUser);
+}
+
+async function loginWithDiscord() {
+  try {
+    const res = await fetch(`${API_URL}/auth/discord/url`);
+    const data = await res.json();
+    if (data.success) {
+      window.location.href = data.url;
+    }
+  } catch (err) {
+    console.error('Login failed:', err);
+    showToast('Failed to start Discord login', 'info');
+  }
+}
+
+async function handleOAuthCallback(code) {
+  try {
+    const res = await fetch(`${API_URL}/auth/discord/callback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    
+    if (data.success) {
+      currentUser = data.user;
+      localStorage.setItem('nightlog_user', JSON.stringify(data.user));
+      showToast(`Welcome back, ${data.user.username}!`, 'success');
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      showToast(data.error || 'Login failed', 'info');
+    }
+  } catch (err) {
+    console.error('OAuth callback failed:', err);
+    showToast('Authentication failed', 'info');
+  }
+  render();
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem('nightlog_user');
+  showToast('Logged out', 'info');
+  render();
+}
+
 // ── DATA (loaded from API) ──
 let EVENTS = [];
 let MEMBERS = [];
 let isLoading = true;
+
+// ── TIME HELPERS ──
+function convertTo12Hour(time24) {
+  if (!time24 || time24 === 'TBD') return 'TBD';
+  const [hours, minutes] = time24.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+}
+
+function convertTo24Hour(time12) {
+  const match = time12.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return time12;
+  let [_, hour, min, period] = match;
+  hour = parseInt(hour);
+  if (period.toUpperCase() === 'PM' && hour !== 12) hour += 12;
+  if (period.toUpperCase() === 'AM' && hour === 12) hour = 0;
+  return `${String(hour).padStart(2,'0')}:${min}`;
+}
+
+function generateTimeOptions(selectedTime) {
+  const times = [];
+  for (let h = 1; h <= 12; h++) {
+    ['00', '30'].forEach(m => {
+      ['AM', 'PM'].forEach(period => {
+        const time = `${h}:${m} ${period}`;
+        const selected = time === selectedTime ? 'selected' : '';
+        times.push(`<option value="${time}" ${selected}>${time}</option>`);
+      });
+    });
+  }
+  return times.join('');
+}
 
 // ── API FUNCTIONS ──
 async function fetchEvents() {
@@ -521,8 +620,8 @@ async function fetchEvents() {
         id: e.id,
         title: e.title,
         type: e.type,
-        date: e.event_date,
-        time: e.event_time || 'TBD',
+        date: e.event_date.split('T')[0], // Extract just YYYY-MM-DD
+        time: convertTo12Hour(e.event_time) || 'TBD',
         duration: e.duration || 'TBD',
         desc: e.description || '',
         host: e.host_name || 'NIGHTLOG',
@@ -569,7 +668,7 @@ async function createEvent(eventData) {
         description: eventData.desc,
         type: eventData.type,
         event_date: eventData.date,
-        event_time: eventData.time,
+        event_time: convertTo24Hour(eventData.time), // Convert to 24-hour for API
         duration: eventData.duration,
         discord_sync: true
       })
@@ -610,7 +709,7 @@ let calYear = 2026, calMonth = 1; // 0-indexed: 1 = February
 let selectedEvent = null;
 let userRSVPs = new Set([1, 3]); // pre-RSVPd
 let showModal = false;
-let newEventData = { title:'', type:'gaming', date:'', time:'', duration:'', desc:'' };
+let newEvent = { title:'', type:'gaming', date:'', time:'7:00 PM', duration:'2h', desc:'' };
 
 // ── ROUTER ──
 function showPage(p) {
@@ -668,7 +767,7 @@ function renderCalendar() {
         <div class="section-title">Event <span>Calendar</span></div>
         <div class="section-sub">Community schedule & upcoming sessions</div>
       </div>
-      <button class="btn btn-primary" onclick="openCreateModal()">＋ Create Event</button>
+      ${currentUser?.isAdmin ? '<button class="btn btn-primary" onclick="openCreateModal()">＋ Create Event</button>' : ''}
     </div>
     <div class="stats-bar">
       <div class="stat-card">
@@ -974,7 +1073,9 @@ function renderCreateModal() {
             </div>
             <div class="form-group">
               <label class="form-label">Time</label>
-              <input type="time" class="form-input" id="ne-time" value="${newEvent.time}" oninput="newEvent.time=this.value" />
+              <select class="form-input form-select" id="ne-time" onchange="newEvent.time=this.value">
+                ${generateTimeOptions(newEvent.time)}
+              </select>
             </div>
           </div>
           <div class="form-row">
@@ -1079,12 +1180,13 @@ function rerenderModal() {
 }
 
 async function submitCreateEvent() {
+  if (!currentUser?.isAdmin) { showToast('Only admins can create events', 'info'); return; }
   if (!newEvent.title.trim()) { showToast('Please enter an event title', 'info'); return; }
   if (!newEvent.date) { showToast('Please pick a date', 'info'); return; }
   
   const success = await createEvent(newEvent);
   if (success) {
-    newEvent = { title:'', type:'gaming', date:'', time:'18:00', duration:'2h', desc:'' };
+    newEvent = { title:'', type:'gaming', date:'', time:'7:00 PM', duration:'2h', desc:'' };
     createModalOpen = false;
     render();
   }
