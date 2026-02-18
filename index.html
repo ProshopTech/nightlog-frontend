@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NIGHTLOG — Community Event Hub</title>
+<title>HERALD — Community Event Hub</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
 <style>
   :root {
@@ -478,7 +478,7 @@
   <header>
     <div class="logo">
       <div class="logo-dot"></div>
-      NIGHTLOG
+      HERALD
     </div>
     <nav>
       <button class="nav-btn active" onclick="showPage('calendar')">⬡ Calendar</button>
@@ -503,7 +503,7 @@
 <!-- ════════════════════════════ SCRIPTS ════════════════════════════ -->
 <script>
 // ── API CONFIG ──
-const API_URL = 'https://nightlog-backend-production.up.railway.app/api';
+const API_URL = 'https://herald-backend-production.up.railway.app/api';
 
 // ── AUTH (Discord OAuth) ──
 let currentUser = null; // null = not logged in
@@ -517,7 +517,7 @@ if (oauthCode) {
 }
 
 // Try to load user from localStorage
-const savedUser = localStorage.getItem('nightlog_user');
+const savedUser = localStorage.getItem('herald_user');
 if (savedUser) {
   currentUser = JSON.parse(savedUser);
 }
@@ -546,7 +546,7 @@ async function handleOAuthCallback(code) {
     
     if (data.success) {
       currentUser = data.user;
-      localStorage.setItem('nightlog_user', JSON.stringify(data.user));
+      localStorage.setItem('herald_user', JSON.stringify(data.user));
       showToast(`Welcome back, ${data.user.username}!`, 'success');
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -563,7 +563,7 @@ async function handleOAuthCallback(code) {
 
 function logout() {
   currentUser = null;
-  localStorage.removeItem('nightlog_user');
+  localStorage.removeItem('herald_user');
   showToast('Logged out', 'info');
   updateAuthButton();
   render();
@@ -634,7 +634,7 @@ async function fetchEvents() {
         time: convertTo12Hour(e.event_time) || 'TBD',
         duration: e.duration || 'TBD',
         desc: e.description || '',
-        host: e.host_name || 'NIGHTLOG',
+        host: e.host_name || 'HERALD',
         rsvps: [], // Will be populated when we fetch attendees
         maxSlots: e.max_slots,
         discord: e.discord_sync
@@ -916,13 +916,13 @@ function renderProfiles() {
 // ── DISCORD PAGE ──
 function renderDiscord() {
   const commands = [
-    { name:'/nightlog events', desc:'List all upcoming events in a Discord embed' },
-    { name:'/nightlog create', desc:'Create a new event from Discord' },
-    { name:'/nightlog rsvp [id]', desc:'RSVP to an event by ID' },
-    { name:'/nightlog unrsvp [id]', desc:'Remove your RSVP from an event' },
-    { name:'/nightlog who [id]', desc:'See who is going to an event' },
-    { name:'/nightlog today', desc:'Show all events happening today' },
-    { name:'/nightlog sync', desc:'Force sync between Discord and website' },
+    { name:'/herald events', desc:'List all upcoming events in a Discord embed' },
+    { name:'/herald create', desc:'Create a new event from Discord' },
+    { name:'/herald rsvp [id]', desc:'RSVP to an event by ID' },
+    { name:'/herald unrsvp [id]', desc:'Remove your RSVP from an event' },
+    { name:'/herald who [id]', desc:'See who is going to an event' },
+    { name:'/herald today', desc:'Show all events happening today' },
+    { name:'/herald sync', desc:'Force sync between Discord and website' },
   ];
   return `
     <div class="section-header">
@@ -936,7 +936,7 @@ function renderDiscord() {
         <div class="sync-status">
           <div class="sync-icon">🤖</div>
           <div class="sync-info">
-            <div class="sync-title">NIGHTLOG Bot — Connected & Syncing</div>
+            <div class="sync-title">HERALD Bot — Connected & Syncing</div>
             <div class="sync-sub">Server: Your Gaming Community · Members: 47 · Last sync: just now</div>
           </div>
           <button class="btn btn-sm btn-cyan" onclick="showToast('Sync triggered!', 'success')">⟳ Sync Now</button>
