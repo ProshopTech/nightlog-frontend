@@ -491,10 +491,7 @@
         <div class="discord-dot"></div>
         BOT ONLINE
       </div>
-      ${currentUser 
-        ? `<div class="avatar-btn" onclick="logout()" title="Logout">${currentUser.username.slice(0,2).toUpperCase()}</div>`
-        : `<button class="btn btn-sm btn-primary" onclick="loginWithDiscord()">Login with Discord</button>`
-      }
+      <div id="auth-button"></div>
     </div>
   </header>
 
@@ -553,6 +550,7 @@ async function handleOAuthCallback(code) {
       showToast(`Welcome back, ${data.user.username}!`, 'success');
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
+      updateAuthButton();
     } else {
       showToast(data.error || 'Login failed', 'info');
     }
@@ -567,7 +565,19 @@ function logout() {
   currentUser = null;
   localStorage.removeItem('nightlog_user');
   showToast('Logged out', 'info');
+  updateAuthButton();
   render();
+}
+
+function updateAuthButton() {
+  const authBtn = document.getElementById('auth-button');
+  if (!authBtn) return;
+  
+  if (currentUser) {
+    authBtn.innerHTML = `<div class="avatar-btn" onclick="logout()" title="Logout">${currentUser.username.slice(0,2).toUpperCase()}</div>`;
+  } else {
+    authBtn.innerHTML = `<button class="btn btn-sm btn-primary" onclick="loginWithDiscord()">Login with Discord</button>`;
+  }
 }
 
 // ── DATA (loaded from API) ──
@@ -689,6 +699,7 @@ async function createEvent(eventData) {
 // Load data on page load
 async function loadData() {
   isLoading = true;
+  updateAuthButton(); // Show login/logout button
   await Promise.all([fetchEvents(), fetchMembers()]);
   isLoading = false;
   render();
@@ -1036,7 +1047,7 @@ function renderEventModal() {
 
 // ── CREATE EVENT MODAL ──
 let createModalOpen = false;
-let newEvent = { title:'', type:'gaming', date:'', time:'18:00', duration:'2h', desc:'' };
+// newEvent already declared earlier
 
 function renderCreateModal() {
   if (!createModalOpen) return '';
